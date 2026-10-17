@@ -19,7 +19,7 @@ Install:
 import argparse
 import sys
 from pathlib import Path
-from src.functions import convert
+from PdfExtractor import PdfExtractor
 
 def main():
     parser = argparse.ArgumentParser(description="Convert PDF files to text.")
@@ -36,6 +36,8 @@ def main():
     argument_lang = args.lang
     argument_output = args.output
 
+    pdf_extractor = PdfExtractor()
+
     src = Path(path_argument)
     if not src.exists():
         sys.exit(f"Error: '{src}' does not exist.")
@@ -47,12 +49,12 @@ def main():
         for pdf in pdfs:
             print(f"Converting {pdf.name}...")
             try:
-                convert(pdf, pdf.with_suffix(".txt"), argument_ocr, argument_pages, args.lang)
+                pdf_extractor.convert(pdf, pdf.with_suffix(".txt"), argument_ocr, argument_pages, args.lang)
             except Exception as e:
                 print(f"  Failed: {e}", file=sys.stderr)
     else:
         out = Path(argument_output) if argument_output else src.with_suffix(".txt")
-        convert(src, out, argument_ocr, argument_pages, argument_lang)
+        pdf_extractor.convert(src, out, argument_ocr, argument_pages, argument_lang)
 
 if __name__ == "__main__":
     main()
