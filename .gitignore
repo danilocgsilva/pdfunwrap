@@ -1,2 +1,3 @@
 build
 pdftotext.egg-info
+src/__pycache__/functions.cpython-311.pyc

@@ -19,85 +19,7 @@ Install:
 import argparse
 import sys
 from pathlib import Path
-
-
-def parse_page_range(spec, total):
-    """Turn '1-5' or '3' into a list of zero-based page indexes."""
-    if not spec:
-        return list(range(total))
-    if "-" in spec:
-        start, end = spec.split("-", 1)
-        start = int(start) if start else 1
-        end = int(end) if end else total
-    else:
-        start = end = int(spec)
-    start = max(start, 1)
-    end = min(end, total)
-    return list(range(start - 1, end))
-
-
-def extract_with_pdfplumber(pdf_path, pages_spec=None):
-    import pdfplumber
-
-    chunks = []
-    with pdfplumber.open(pdf_path) as pdf:
-        for i in parse_page_range(pages_spec, len(pdf.pages)):
-            text = pdf.pages[i].extract_text() or ""
-            chunks.append(f"--- Page {i + 1} ---\n{text}")
-    return "\n\n".join(chunks)
-
-
-def extract_with_pypdf(pdf_path, pages_spec=None):
-    from pypdf import PdfReader
-
-    reader = PdfReader(pdf_path)
-    chunks = []
-    for i in parse_page_range(pages_spec, len(reader.pages)):
-        text = reader.pages[i].extract_text() or ""
-        chunks.append(f"--- Page {i + 1} ---\n{text}")
-    return "\n\n".join(chunks)
-
-
-def extract_with_ocr(pdf_path, pages_spec=None, lang="eng"):
-    import pytesseract
-    from pdf2image import convert_from_path
-
-    images = convert_from_path(pdf_path, dpi=300)
-    chunks = []
-    for i in parse_page_range(pages_spec, len(images)):
-        text = pytesseract.image_to_string(images[i], lang=lang)
-        chunks.append(f"--- Page {i + 1} ---\n{text}")
-    return "\n\n".join(chunks)
-
-
-def has_real_text(text):
-    """True if extraction produced more than just page markers."""
-    body = "\n".join(
-        line for line in text.splitlines() if not line.startswith("--- Page ")
-    )
-    return len(body.strip()) > 20
-
-
-def convert(pdf_path, out_path, use_ocr=False, pages_spec=None, lang="eng"):
-    if use_ocr:
-        text = extract_with_ocr(pdf_path, pages_spec, lang)
-    else:
-        try:
-            text = extract_with_pdfplumber(pdf_path, pages_spec)
-        except Exception as e:
-            print(f"  pdfplumber failed ({e}); trying pypdf...", file=sys.stderr)
-            text = extract_with_pypdf(pdf_path, pages_spec)
-
-        if not has_real_text(text):
-            print(
-                "  Warning: little or no text found. This may be a scanned PDF; "
-                "try again with --ocr.",
-                file=sys.stderr,
-            )
-
-    out_path.write_text(text, encoding="utf-8")
-    print(f"Saved: {out_path}")
-
+from src.functions import convert
 
 def main():
     parser = argparse.ArgumentParser(description="Convert PDF files to text.")
@@ -108,7 +30,13 @@ def main():
     parser.add_argument("--pages", help="Page range, e.g. 1-5 or 3")
     args = parser.parse_args()
 
-    src = Path(args.input)
+    path_argument = args.input
+    argument_ocr = args.ocr
+    argument_pages = args.pages
+    argument_lang = args.lang
+    argument_output = args.output
+
+    src = Path(path_argument)
     if not src.exists():
         sys.exit(f"Error: '{src}' does not exist.")
 
@@ -119,13 +47,12 @@ def main():
         for pdf in pdfs:
             print(f"Converting {pdf.name}...")
             try:
-                convert(pdf, pdf.with_suffix(".txt"), args.ocr, args.pages, args.lang)
+                convert(pdf, pdf.with_suffix(".txt"), argument_ocr, argument_pages, args.lang)
             except Exception as e:
                 print(f"  Failed: {e}", file=sys.stderr)
     else:
-        out = Path(args.output) if args.output else src.with_suffix(".txt")
-        convert(src, out, args.ocr, args.pages, args.lang)
-
+        out = Path(argument_output) if argument_output else src.with_suffix(".txt")
+        convert(src, out, argument_ocr, argument_pages, argument_lang)
 
 if __name__ == "__main__":
     main()
